@@ -2308,34 +2308,43 @@ is not active."
            resp items (cached-proxies :none)
            (proxies
             (lambda ()
-              (if (listp cached-proxies) cached-proxies
-                (setq resp
-                      (jsonrpc-request server
-                                       :textDocument/completion
-                                       (eglot--CompletionParams)
-                                       :deferred :textDocument/completion
-                                       :cancel-on-input t))
-                (setq items (append
-                             (if (vectorp resp) resp (plist-get resp :items))
-                             nil))
-                (setq cached-proxies
-                      (mapcar
-                       (jsonrpc-lambda
-                           (&rest item &key label insertText insertTextFormat
-                                  &allow-other-keys)
-                         (let ((proxy
-                                (cond ((and (eql insertTextFormat 2)
-                                            (eglot--snippet-expansion-fn))
-                                       (string-trim-left label))
-                                      ((and insertText
-                                            (not (string-empty-p insertText)))
-                                       insertText)
-                                      (t
-                                       (string-trim-left label)))))
-                           (unless (zerop (length proxy))
-                             (put-text-property 0 1 'eglot--lsp-item item proxy))
-                           proxy))
-                       items)))))
+	      (let ((list
+		     (if (listp cached-proxies) cached-proxies
+                       (setq resp
+			     (jsonrpc-request server
+					      :textDocument/completion
+					      (eglot--CompletionParams)
+					      :deferred :textDocument/completion
+					      :cancel-on-input t))
+                       (setq items (append
+				    (if (vectorp resp) resp (plist-get resp :items))
+				    nil))
+                       (setq cached-proxies
+			     (mapcar
+			      (jsonrpc-lambda
+				  (&rest item &key label insertText insertTextFormat
+					 &allow-other-keys)
+				(let ((proxy
+                                       (cond ((and (eql insertTextFormat 2)
+						   (eglot--snippet-expansion-fn))
+					      (string-trim-left label))
+					     ((and insertText
+						   (not (string-empty-p insertText)))
+					      insertText)
+					     (t
+					      (string-trim-left label)))))
+				  (unless (zerop (length proxy))
+				    (put-text-property 0 1 'eglot--lsp-item item proxy))
+				  proxy))
+			      items)))))
+		(if completion-regexp-list
+		    (cl-remove-if-not
+		     (lambda (cand)
+		       (cl-every (lambda (regexp)
+				  (string-match-p regexp cand))
+				completion-regexp-list))
+		     list)
+		  list))))
            (resolved (make-hash-table))
            (resolve-maybe
             ;; Maybe completion/resolve JSON object `lsp-comp' into
